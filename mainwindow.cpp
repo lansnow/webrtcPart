@@ -5,6 +5,8 @@
 #include "endpointvolume.h"
 #include "Audioclient.h"
 
+#include "audiopolicy.h" // IAudioSessionManager 这个服务相关
+
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
@@ -30,9 +32,29 @@ void MainWindow::on_pushButton_clicked()
 
         hr = CoCreateInstance(__uuidof(MMDeviceEnumerator),nullptr,CLSCTX_ALL,__uuidof(IMMDeviceEnumerator),(void**)&pDeviceEnumerator);
         if(FAILED(hr)) throw "CoCreateInstance";
+
+        // 以下这句是获取音频默认的输出设备
         hr = pDeviceEnumerator->GetDefaultAudioEndpoint(eRender,eMultimedia,&pDevices);
         if(FAILED(hr)) throw "GetDefaultAudioEndpoint";
 
+
+        /*以下是WASSIP相关测试*/
+        IAudioSessionManager* pManger = NULL;
+        // 从设备中获取IAudioSessionManager对象
+        hr = pDevices->Activate(__uuidof(IAudioSessionManager),CLSCTX_ALL,nullptr,(void**)&pManger);
+        if(FAILED(hr)) throw "pDevice->Active IAudioSessionManager";
+        /*
+            以下代码是对IAudioSessionManager对象进行的操作
+        */
+        // 这部分其实是webrtc里的 InitSpeaker操作，返回一个WAAS的操作句柄
+        ISimpleAudioVolume* _ptrRenderSimpleVolue=NULL; //这个对象是用来改变声音信息的，使用提基于WAAS那个服务进行的
+        int ret = pManger->GetSimpleAudioVolume(NULL,false,&_ptrRenderSimpleVolue);
+        if(ret!=0 || _ptrRenderSimpleVolue==NULL){
+            qDebug()<<"fail";
+
+        }else{
+            qDebug()<<"can do next";
+        }
 
         hr = pDevices->Activate(__uuidof(IAudioEndpointVolume),CLSCTX_ALL,nullptr,(void**)&pAudioVolume);
         if(FAILED(hr)) throw "pDevice->Active";
