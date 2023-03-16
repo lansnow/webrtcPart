@@ -25,7 +25,11 @@ void MainWindow::on_pushButton_clicked()
     HRESULT hr;
     IMMDeviceEnumerator* pDeviceEnumerator=nullptr;
     IMMDevice* pDevices = nullptr;
-    IAudioEndpointVolume* pAudioVolume =nullptr;
+    /*
+        以下两个对象都是通过 pDevices->Activate获取的
+    */
+    IAudioSessionManager* pManger = NULL;    // session层的设置只针对当前应用
+    IAudioEndpointVolume* pAudioVolume =nullptr; // 这个对象的设置是对所有的应用都生效
     IAudioClient* pAudioClient = nullptr;
 
     try {
@@ -34,12 +38,14 @@ void MainWindow::on_pushButton_clicked()
         if(FAILED(hr)) throw "CoCreateInstance";
 
         // 以下这句是获取音频默认的输出设备
+        // 这里的第一个参数，是会返回对应的采集设备跟播放设备的，即参数1的变化，返回的设备有可能是耳机，也
+        // 可能是麦客风
         hr = pDeviceEnumerator->GetDefaultAudioEndpoint(eRender,eMultimedia,&pDevices);
         if(FAILED(hr)) throw "GetDefaultAudioEndpoint";
 
 
         /*以下是WASSIP相关测试*/
-        IAudioSessionManager* pManger = NULL;
+
         // 从设备中获取IAudioSessionManager对象
         hr = pDevices->Activate(__uuidof(IAudioSessionManager),CLSCTX_ALL,nullptr,(void**)&pManger);
         if(FAILED(hr)) throw "pDevice->Active IAudioSessionManager";
@@ -48,6 +54,8 @@ void MainWindow::on_pushButton_clicked()
         */
         // 这部分其实是webrtc里的 InitSpeaker操作，返回一个WAAS的操作句柄
         ISimpleAudioVolume* _ptrRenderSimpleVolue=NULL; //这个对象是用来改变声音信息的，使用提基于WAAS那个服务进行的
+        // 上面那行的目的是为了在外部能够改变声音大小，如果设备是麦，那就是采集的声音大小
+        // 如果是音响设置，则可以调用播放声音的大小
         int ret = pManger->GetSimpleAudioVolume(NULL,false,&_ptrRenderSimpleVolue);
         if(ret!=0 || _ptrRenderSimpleVolue==NULL){
             qDebug()<<"fail";
@@ -56,6 +64,8 @@ void MainWindow::on_pushButton_clicked()
             qDebug()<<"can do next";
         }
 
+        // 外放声音里，stereo 文体声 mono 单声道
+        // 根据声道的不同，需要对缓存buffer进行大小调整
         hr = pDevices->Activate(__uuidof(IAudioEndpointVolume),CLSCTX_ALL,nullptr,(void**)&pAudioVolume);
         if(FAILED(hr)) throw "pDevice->Active";
 
